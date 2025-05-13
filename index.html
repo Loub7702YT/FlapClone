@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Flappy Bird</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    canvas {
+      background: #70c5ce;
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="320" height="480"></canvas>
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let frames = 0;
+  const DEGREE = Math.PI / 180;
+
+  // Load sprite
+  const sprite = new Image();
+  sprite.src = 'https://openai-craft-assets.s3.amazonaws.com/flappy-bird-sprite.png';
+
+  sprite.onload = function () {
+    loop(); // Start the game loop once the sprite is fully loaded
+  };
+
+  // Game state
+  const state = {
+    current: 0,
+    getReady: 0,
+    game: 1,
+    over: 2
+  };
+
+  // Control
+  canvas.addEventListener("click", function () {
+    switch (state.current) {
+      case state.getReady:
+        state.current = state.game;
+        break;
+      case state.game:
+        bird.flap();
+        break;
+      case state.over:
+        pipes.reset();
+        bird.reset();
+        score.reset();
+        state.current = state.getReady;
+        break;
+    }
+  });
+
+  // Bird
+  const bird = {
+    x: 50,
+    y: 150,
+    w: 34,
+    h: 26,
+
+    frame: 0,
+    gravity: 0.25,
+    jump: 4.6,
+    speed: 0,
+    rotation: 0,
+
+    draw() {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+      ctx.drawImage(sprite, 276, 112, this.w, this.h, -this.w / 2, -this.h / 2, this.w, this.h);
+      ctx.restore();
+    },
+
+    flap() {
+      this.speed = -this.jump;
+    },
+
+    update() {
+      if (state.current === state.getReady) {
+        this.y = 150;
+        this.rotation = 0 * DEGREE;
+      } else {
+        this.speed += this.gravity;
+        this.y += this.speed;
+
+        if (this.y + this.h / 2 >= canvas.height) {
+          this.y = canvas.height - this.h / 2;
+          if (state.current === state.game) state.current = state.over;
+        }
+
+        this.rotation = this.speed >= this.jump ? 90 * DEGREE : -25 * DEGREE;
+      }
+    },
+
+    reset() {
+      this.speed = 0;
+      this.y = 150;
+    }
+  };
+
+  // Pipes
+  const pipes = {
+    position: [],
+    top: { sX: 553, sY: 0 },
+    bottom: { sX: 502, sY: 0 },
+    w: 53,
+    h: 400,
+    gap: 85,
+    maxYPos: -150,
+    dx: 2,
+
+    draw() {
+      for (let i = 0; i < this.position.length; i++) {
+        let p = this.position[i];
+        ctx.drawImage(sprite, this.top.sX, this.top.sY, this.w, this.h, p.x, p.y, this.w, this.h);
+        ctx.drawImage(sprite, this.bottom.sX, this.bottom.sY, this.w, this.h,
+          p.x, p.y + this.h + this.gap, this.w, this.h);
+      }
+    },
+
+    update() {
+      if (state.current !== state.game) return;
+
+      if (frames % 100 === 0) {
+        this.position.push({ x: canvas.width, y: this.maxYPos * (Math.random() + 1) });
+      }
+
+      for (let i = 0; i < this.position.length; i++) {
+        let p = this.position[i];
+        p.x -= this.dx;
+
+        // Collision detection
+        let bottomPipeYPos = p.y + this.h + this.gap;
+        if (
+          bird.x + bird.w / 2 > p.x && bird.x - bird.w / 2 < p.x + this.w &&
+          (bird.y - bird.h / 2 < p.y + this.h || bird.y + bird.h / 2 > bottomPipeYPos)
+        ) {
+          state.current = state.over;
+        }
+
+        // Remove passed pipes
+        if (p.x + this.w <= 0) {
+          this.position.shift();
+          score.value++;
+        }
+      }
+    },
+
+    reset() {
+      this.position = [];
+    }
+  };
+
+  // Score
+  const score = {
+    value: 0,
+
+    draw() {
+      ctx.fillStyle = "#FFF";
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 2;
+      ctx.font = "35px Tahoma";
+      ctx.fillText(this.value, canvas.width / 2, 50);
+      ctx.strokeText(this.value, canvas.width / 2, 50);
+    },
+
+    reset() {
+      this.value = 0;
+    }
+  };
+
+  // Game loop
+  function draw() {
+    ctx.fillStyle = '#70c5ce';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    pipes.draw();
+    bird.draw();
+    score.draw();
+  }
+
+  function update() {
+    bird.update();
+    pipes.update();
+  }
+
+  function loop() {
+    update();
+    draw();
+    frames++;
+    requestAnimationFrame(loop);
+  }
+</script>
+</body>
+</html>
